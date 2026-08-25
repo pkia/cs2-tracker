@@ -55,16 +55,16 @@ def entry(win=True, my_pid="p1"):
     return {
         "match_id": "m-1",
         "started_at": 1756000000,
-        "voting": {"map": {"name": "de_mirage"}},
+        "voting": {},
         "teams": {
-            "faction1": {"team_id": "t1", "roster": [
+            "faction1": {"team_id": "t1", "players": [
                 {"player_id": my_pid}]},
-            "faction2": {"team_id": "t2", "roster": [
+            "faction2": {"team_id": "t2", "players": [
                 {"player_id": "p2"}]},
         },
         "results": {"winner": "faction1" if win else "faction2",
-                    "score": {"faction1": {"score": 13 if win else 7},
-                              "faction2": {"score": 7 if win else 13}}},
+                    "score": {"faction1": 13 if win else 7,
+                              "faction2": 7 if win else 13}},
     }
 
 

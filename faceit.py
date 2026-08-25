@@ -75,13 +75,26 @@ def _f(v) -> Optional[float]:
 
 
 def find_my_faction(entry: dict, my_player_id: str) -> Optional[str]:
-    """Return 'faction1'/'faction2' if I'm on the roster."""
+    """Return 'faction1'/'faction2' if I'm on a team roster.
+
+    History payloads put players under teams.<faction>.players; the
+    match detail endpoint uses .roster. Accept both.
+    """
     teams = entry.get("teams") or {}
     for faction_id, team in teams.items():
-        roster = team.get("roster") or []
+        roster = (team.get("players") or []) + (team.get("roster") or [])
         if any(p.get("player_id") == my_player_id for p in roster):
             return faction_id
     return None
+
+
+def _score_of(score, faction: str) -> int:
+    """Score values are flat ints in history items, nested dicts in
+    match details."""
+    v = score.get(faction) if isinstance(score, dict) else None
+    if isinstance(v, dict):
+        v = v.get("score")
+    return _int(v)
 
 
 def to_match(entry: dict, my_player_id: str,
@@ -108,11 +121,11 @@ def to_match(entry: dict, my_player_id: str,
         "premier_rating": None, "friends": [],
     }
 
-    # result + rounds from the history entry
+    # result + rounds from the history entry (flat scores in history)
     score = (entry.get("results") or {}).get("score") or {}
     other = "faction2" if my_faction == "faction1" else "faction1"
-    t_r = _int((score.get(my_faction) or {}).get("score"))
-    e_r = _int((score.get(other) or {}).get("score"))
+    t_r = _score_of(score, my_faction)
+    e_r = _score_of(score, other)
     winner = (entry.get("results") or {}).get("winner")
     if winner:
         result = "win" if winner == my_faction else "loss"
@@ -143,6 +156,7 @@ def to_match(entry: dict, my_player_id: str,
             pass
 
     m["team_rounds"], m["enemy_rounds"] = t_r, e_r
-    m["result"] = result if t_r == e_r and result == "draw" else (
-        "win" if t_r > e_r else "loss" if t_r < e_r else result)
+    if result == "draw" and t_r != e_r:
+        result = "win" if t_r > e_r else "loss"
+    m["result"] = result
     return m
