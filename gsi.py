@@ -53,7 +53,7 @@ class GsiTracker:
                 self.cur = self._new(name, mode, gs)
                 ev = "started"
 
-            self._update(mapd, gs)
+            self._update(mapd, gs)          # apply this payload FIRST
             if mapd.get("phase") == "gameover":
                 self._finalise()
                 ev = "ended"

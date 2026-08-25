@@ -25,7 +25,7 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(BASE, "data")
 os.makedirs(DATA, exist_ok=True)
 SECRETS = os.path.join(BASE, "secrets")
-STORE_PATH = os.path.jsdelivr(DATA, "tracker.json")
+STORE_PATH = os.path.join(DATA, "tracker.json")
 PORT = int(os.environ.get("CS2TRACKER_PORT", "8092"))
 
 log = logging.getLogger("cs2tracker")

@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CS2 Tracker</title>
+<style>
+  :root {
+    --bg: #0e1117; --panel: #161b22; --panel2: #1c2129; --line: #2a303b;
+    --txt: #e6edf3; --dim: #8b949e; --orange: #ff5500;
+    --win: #3fb950; --loss: #f85149; --faceit: #ff5500; --prem: #66a3ff;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--txt);
+         font: 15px/1.5 ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 24px 16px 60px; }
+  header { display: flex; align-items: baseline; gap: 14px; margin-bottom: 18px; }
+  h1 { font-size: 20px; letter-spacing: .5px; }
+  h1 .or { color: var(--orange); }
+  .sub { color: var(--dim); font-size: 12px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap: 10px; margin-bottom: 24px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+  .card .k { color: var(--dim); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+  .card .v { font-size: 26px; font-weight: 700; margin-top: 4px; }
+  .card .v small { font-size: 13px; color: var(--dim); font-weight: 400; }
+  .faceit .v { color: var(--faceit); } .prem .v { color: var(--prem); }
+  section { margin-bottom: 28px; }
+  h2 { font-size: 13px; color: var(--dim); text-transform: uppercase;
+       letter-spacing: 1.5px; margin-bottom: 10px; }
+  table { width: 100%; border-collapse: collapse; background: var(--panel);
+          border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  th { text-align: left; font-size: 11px; color: var(--dim); padding: 9px 12px;
+       border-bottom: 1px solid var(--line); text-transform: uppercase; letter-spacing: 1px; }
+  td { padding: 9px 12px; border-bottom: 1px solid var(--line); font-size: 14px; }
+  tr:last-child td { border-bottom: none; }
+  .W { color: var(--win); font-weight: 700; } .L { color: var(--loss); font-weight: 700; }
+  .D { color: var(--dim); font-weight: 700; }
+  .tag { font-size: 10px; padding: 2px 7px; border-radius: 999px; font-weight: 700; }
+  .tag.faceit { color: var(--faceit); border: 1px solid var(--faceit); }
+  .tag.premier { color: var(--prem); border: 1px solid var(--prem); }
+  .dim { color: var(--dim); } .map { font-weight: 600; }
+  footer { color: var(--dim); font-size: 11px; margin-top: 30px; }
+  .err { color: var(--loss); }
+  .empty { color: var(--dim); padding: 18px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>CS2<span class="or">·</span>TRACKER</h1>
+    <span class="sub" id="updated"></span>
+  </header>
+
+  <div class="cards" id="cards"></div>
+
+  <section>
+    <h2>Recent matches</h2>
+    <table id="matches"><thead><tr>
+      <th></th><th>Map</th><th>Score</th><th>Result</th>
+      <th>K</th><th>D</th><th>A</th><th>K/D</th><th>HS%</th><th>Elo</th>
+    </tr></thead><tbody></tbody></table>
+    <div class="empty" id="empty" hidden>No matches yet — add API keys + play, or check back after the first refresh.</div>
+  </section>
+
+  <footer>faceit · premier · updated locally on the Pi · GSI live-capture for premier</footer>
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const fmtTime = (ts) => {
+  const d = new Date(ts * 1000), now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
+  return sameDay ? d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})
+                 : d.toLocaleDateString([], {day:'2-digit', month:'short'});
+};
+
+async function load() {
+  try {
+    const [sum, mat] = await Promise.all([
+      fetch('/api/summary').then(r => r.json()),
+      fetch('/api/matches?limit=40').then(r => r.json()),
+    ]);
+    cards(sum);
+    table(mat.matches);
+    $('#updated').textContent = 'last refresh ' + new Date(sum.updated * 1000).toLocaleTimeString();
+  } catch (e) {
+    $('#updated').textContent = 'offline?'; 
+  }
+}
+
+function cards(s) {
+  const f = s.faceit || {}, p = s.premier || {};
+  const stat = (cls, k, v, sub) => `<div class="card ${cls}"><div class="k">${k}</div><div class="v">${v ?? '—'}${sub ? ` <small>${sub}</small>` : ''}</div></div>`;
+  let html = '';
+  if (f.elo) html += stat('faceit', 'FACEIT Elo', f.elo);
+  html += stat('faceit', 'FACEIT (all)', `${f.winrate ?? 0}%`, `${f.wins ?? 0}W ${f.losses ?? 0}L · ${f.games ?? 0} games`);
+  html += stat('faceit', 'FACEIT K/D', f.kd ?? '—', f.hs_pct != null ? `${f.hs_pct}% HS` : '');
+  html += stat('prem', 'Premier (tracked)', `${p.winrate ?? 0}%`, `${p.wins ?? 0}W ${p.losses ?? 0}L · ${p.games ?? 0} games`);
+  html += stat('prem', 'Premier K/D', p.kd ?? '—', p.hs_pct != null ? `${p.hs_pct}% HS` : '');
+  $('#cards').innerHTML = html;
+}
+
+function table(ms) {
+  const tb = $('#matches tbody');
+  $('#empty').hidden = ms.length > 0;
+  tb.innerHTML = ms.map(m => {
+    const cls = m.result === 'win' ? 'W' : m.result === 'loss' ? 'L' : 'D';
+    const res = m.result === 'win' ? 'WIN' : m.result === 'loss' ? 'LOSS' : m.result.toUpperCase();
+    const src = `<span class="tag ${m.source}">${m.source === 'faceit' ? 'FACEIT' : 'PREMIER'}</span>`;
+    const elo = m.elo_delta ? `<span class="${m.elo_delta > 0 ? 'W' : 'L'}">${m.elo_delta > 0 ? '+' : ''}${m.elo_delta}</span>` : '<span class="dim">—</span>';
+    const kd = m.deaths ? (m.kills / m.deaths).toFixed(2) : m.kills;
+    return `<tr>
+      <td>${src}</td>
+      <td class="map">${(m.map || '?').replace(/^de_/, '')}</td>
+      <td>${m.team_rounds} : ${m.enemy_rounds}</td>
+      <td class="${cls}">${res}</td>
+      <td>${m.kills || 0}</td><td>${m.deaths || 0}</td><td>${m.assists || 0}</td>
+      <td>${kd}</td>
+      <td>${m.hs_pct != null ? m.hs_pct + '%' : '<span class="dim">—</span>'}</td>
+      <td>${elo}</td>
+    </tr>`;
+  }).join('');
+}
+load();
+setInterval(load, 60000);
+</script>
+</body>
+</html>
