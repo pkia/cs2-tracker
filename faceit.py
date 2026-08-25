@@ -137,12 +137,19 @@ def to_match(entry: dict, my_player_id: str,
         try:
             rd = stats_payload["rounds"][0]
             rs = rd.get("round_stats") or {}
-            if rs.get("map"):
-                m["map"] = rs["map"]
-            if "/" in str(rs.get("score", "")):
-                a, b = str(rs["score"]).split("/")[:2]
-                t_r, e_r = _int(a), _int(b)
-            for team in rd.get("teams", []):
+            # keys are capitalised in production: Map / Score
+            for k in ("Map", "map"):
+                if rs.get(k):
+                    m["map"] = rs[k]
+                    break
+            # Score is "teams[0] / teams[1]" — orient once we know my team
+            score_parts = None
+            for k in ("Score", "score"):
+                if "/" in str(rs.get(k, "")):
+                    score_parts = [_int(x) for x in str(rs[k]).split("/")[:2]]
+                    break
+            my_team_idx = None
+            for idx, team in enumerate(rd.get("teams", [])):
                 for p in team.get("players") or []:
                     if p.get("player_id") == my_player_id:
                         ps = p.get("player_stats") or {}
@@ -151,7 +158,13 @@ def to_match(entry: dict, my_player_id: str,
                         m["assists"] = _int(ps.get("Assists"))
                         m["hs_pct"] = _pct(ps.get("Headshots %"))
                         m["adr"] = _f(ps.get("ADR"))
+                        my_team_idx = idx
                         break
+                if my_team_idx is not None:
+                    break
+            if score_parts and my_team_idx is not None:
+                a, b = score_parts
+                t_r, e_r = (a, b) if my_team_idx == 0 else (b, a)
         except (KeyError, IndexError, AttributeError, ValueError):
             pass
 
