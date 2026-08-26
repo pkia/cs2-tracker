@@ -119,12 +119,20 @@ class Refresher(threading.Thread):
                 cfg["steam_id64"] = sid
                 store.set_meta(steam_id64=sid)
         if sc_key and sid:
+            stats = None
             try:
-                sc = steam_mod.SteamClient(sc_key)
-                store.set_lifetime("steam", sc.cs2_lifetime(sid))
-                store.set_meta(steam_checked=time.time())
+                stats = steam_mod.SteamClient(sc_key).cs2_lifetime(sid)
             except Exception as e:
+                cookie = read_secret("steam_cookie.txt")
+                if cookie:
+                    try:
+                        stats = steam_mod.authed_lifetime(sid, cookie)
+                    except Exception as e2:
+                        log.info("steam authed lifetime: %s", e2)
                 log.info("steam lifetime: %s", e)
+            if stats:
+                store.set_lifetime("steam", stats)
+                store.set_meta(steam_checked=time.time())
 
     @staticmethod
     def config() -> dict:

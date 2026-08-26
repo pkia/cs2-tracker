@@ -11,8 +11,36 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from store import Match, Store, summarize                       # noqa: E402
 from faceit import to_match, find_my_faction                    # noqa: E402
 from gsi import GsiTracker                                      # noqa: E402
+from steam import parse_stat_rows                               # noqa: E402
 
 import app as app_mod                                           # noqa: E402
+
+
+# ------------------------------------------------------- steam stats scrape
+
+STATS_PAGE = """
+<html><body><table>
+<tr><th>Stat</th><th>Value</th></tr>
+<tr><td>Total Kills</td><td>102,930</td></tr>
+<tr><td>Total Deaths</td><td>98,441</td></tr>
+<tr><td>Total Wins</td><td>3,140</td></tr>
+<tr><td>Total Time Played</td><td>1,663.7h</td></tr>
+<tr><td>Knife Kills</td><td>1,046</td></tr>
+<tr><td>Accuracy</td><td>31%</td></tr>
+<tr><td>Broken&nbsp;row</td><td>not-a-number</td></tr>
+<tr><td>Only one cell</td></tr>
+</table></body></html>
+"""
+
+
+def test_parse_stat_rows():
+    d = parse_stat_rows(STATS_PAGE)
+    assert d["Total Kills"] == "102,930"
+    assert d["Total Wins"] == "3,140"
+    assert d["Accuracy"] == "31%"
+    assert d["Total Time Played"] == "1,663.7h"   # unit suffix kept
+    assert "Broken" not in "".join(d)             # non-numeric rows dropped
+    assert len(d) == 6
 
 
 # ---------------------------------------------------------------- store

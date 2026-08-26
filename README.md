@@ -24,17 +24,31 @@ over the tailnet.
 | `/api/summary` | combined stats cards |
 | `/api/matches` | unified match feed (faceit + premier) |
 | `/api/elo` | FACEIT elo history — one sample per elo change, recorded at each hourly refresh since install |
-| `/api/premier/lifetime` | Steam lifetime stats (empty until Valve unblocks new keys; captured-match aggregates live in `/api/summary` → `premier`) |
+| `/api/premier/lifetime` | Steam lifetime stats — via the owner's session cookie, else empty (captured-match aggregates live in `/api/summary` → `premier`) |
 | `/gsi` | CS2 GSI ingest (POST from his gaming PC) |
 
 ## Setup
 
     python3 -m venv venv && venv/bin/pip install -r requirements.txt
     # secrets (chmod 600, outside git):
-    #   faceit_key.txt   — FACEIT Data API key
-    #   steam_key.txt    — Steam Web API key
-    #   player.txt       — lines: faceit_nickname=..., steam_id64=... (or steam_vanity=...)
+    #   faceit_key.txt    — FACEIT Data API key
+    #   steam_key.txt     — Steam Web API key
+    #   steam_cookie.txt  — steamLoginSecure cookie (owner's session; see below)
+    #   player.txt        — lines: faceit_nickname=..., steam_id64=... (or steam_vanity=...)
     venv/bin/python app.py            # :8092
+
+Steam session cookie (how the tracker sees what only a logged-in owner
+can — the same mechanism stats sites use when you "sign in through
+Steam"):
+
+1. log in to <https://steamcommunity.com> in any browser
+2. dev tools (F12) → Application → Cookies → `steamcommunity.com`
+   → copy the **value** of `steamLoginSecure`
+3. `printf %s '<value>' > secrets/steam_cookie.txt && chmod 600 secrets/steam_cookie.txt`
+
+The refresh loop tries the key first, then this session. Logging out
+of that browser session invalidates the cookie; otherwise it lasts
+months. It never leaves the Pi.
 
 GSI capture: drop `deploy/cs2tracker.cfg` into the CS2 cfg directory on
 the gaming PC (`.../Counter-Strike Global Offensive/game/csgo/cfg/`).
