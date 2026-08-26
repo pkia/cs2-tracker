@@ -1,8 +1,12 @@
 """Steam Web API client — CS2 lifetime stats + Premier support data.
 
-Valve publishes NO matchmaking match-history API; we use:
-  IEconItems_730 / GetUserStatsForGame for lifetime totals, and
-  GSI (see gsi.py) for live Premier match capture.
+Valve publishes NO matchmaking match-history API, and as of 2026 the
+Web API keys created after Valve's restriction return 400 for
+GetUserStatsForGame even on public profiles (verified against other
+public accounts) — so lifetime stats via API are unavailable to us;
+the same goes for the community stats/games pages, which now require
+sign-in. The call below is kept anyway: it self-heals if Valve ever
+re-allows it. Premier match history comes from GSI (see gsi.py).
 """
 from __future__ import annotations
 
