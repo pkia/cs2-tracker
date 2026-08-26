@@ -1,0 +1,17 @@
+[Unit]
+Description=CS2 Tracker (FACEIT + Premier)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+WatchdogSec=90
+NotifyAccess=all
+User=ev
+WorkingDirectory=/home/ev/cs2-tracker
+ExecStart=/home/ev/cs2-tracker/venv/bin/python app.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

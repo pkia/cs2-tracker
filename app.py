@@ -19,13 +19,14 @@ from flask import Flask, jsonify, render_template, request
 import faceit as faceit_mod
 import steam as steam_mod
 from gsi import GsiTracker
+from healer import SelfHealer
 from store import Match, Store, summarize
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(BASE, "data")
 os.makedirs(DATA, exist_ok=True)
 SECRETS = os.path.join(BASE, "secrets")
-STORE_PATH = os.path.jsdelivr(DATA, "tracker.json")
+STORE_PATH = os.path.join(DATA, "tracker.json")
 PORT = int(os.environ.get("CS2TRACKER_PORT", "8092"))
 
 log = logging.getLogger("cs2tracker")
@@ -63,6 +64,21 @@ def notify_match(m: Match):
         pass
 
 
+def _ntfy(title: str, body: str):
+    """Push an arbitrary note (healer alerts etc)."""
+    url, tok = read_secret("ntfy_url.txt"), read_secret("ntfy_token.txt")
+    if not (url and tok):
+        return
+    try:
+        subprocess.run(
+            ["curl", "-s", "-H", f"Authorization: Bearer {tok}",
+             "-H", f"Title: {title}", "-d", body, f"{url}/cs2"],
+            timeout=5, stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL)
+    except Exception:
+        pass
+
+
 gsi = GsiTracker(store, on_match=notify_match)
 
 
@@ -93,6 +109,7 @@ class Refresher(threading.Thread):
             return
         if cfg.get("faceit_nickname") and read_secret("faceit_key.txt"):
             self.pull_faceit(cfg)
+            store.set_meta(last_refresh_success=time.time())
         sc_key = read_secret("steam_key.txt")
         sid = cfg.get("steam_id64")
         if not sid and sc_key and cfg.get("steam_vanity"):
@@ -167,6 +184,29 @@ refresher = Refresher()
 refresher.start()
 
 
+def _refresher_alive() -> bool:
+    return refresher.is_alive()
+
+
+def _restart_refresher():
+    global refresher
+    if refresher.is_alive():
+        return
+    refresher = Refresher()
+    refresher.start()
+
+
+healer = SelfHealer(
+    port=PORT,
+    refresher_starter=_restart_refresher,
+    refresher_probe=_refresher_alive,
+    gsi=gsi, store=store,
+    notify=_ntfy,
+    store_path=STORE_PATH,
+)
+healer.start()
+
+
 # --------------------------------------------------------------------------
 # routes
 # --------------------------------------------------------------------------
@@ -215,8 +255,12 @@ def gsi_ingest():
 
 @app.get("/healthz")
 def healthz():
+    try:
+        v = healer.vitals()
+    except Exception:
+        v = {}
     return jsonify(ok=True, matches=len(store.matches(limit=1000)),
-                   live=gsi.cur is not None)
+                   live=gsi.cur is not None, **v)
 
 
 @app.get("/healthz/quiet")

@@ -1,7 +1,7 @@
-# added by project-guard at adoption
+venv/
 __pycache__/
 *.pyc
-*.log
-*.fifo
+data/
+secrets/
+deploy.log
 .deployed_commit
-.deploy_failed
