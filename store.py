@@ -42,6 +42,8 @@ class Match:
 class Store:
     """Thread-safe JSON store: matches + lifetime stats + meta."""
 
+    ELO_CAP = 500   # ~3 weeks of hourly samples
+
     def __init__(self, path: str):
         self.path = path
         self.lock = threading.RLock()
@@ -49,6 +51,7 @@ class Store:
         self._lifetime: dict = {}
         self._meta: dict = {"faceit_elo": None, "premier_rating": None,
                             "updated": 0}
+        self._elo: list[dict] = []
         if os.path.exists(path):
             try:
                 with open(path) as f:
@@ -57,15 +60,17 @@ class Store:
                                  for m in raw.get("matches", [])}
                 self._lifetime = raw.get("lifetime", {})
                 self._meta.update(raw.get("meta", {}))
+                self._elo = raw.get("elo", [])
             except (json.JSONDecodeError, TypeError, KeyError):
                 # corrupt store: start fresh rather than crash the app
-                self._matches, self._lifetime = {}, {}
+                self._matches, self._lifetime, self._elo = {}, {}, []
 
     # ---- persistence -------------------------------------------------
     def _flush(self):
         with self.lock:
             d = {"matches": [asdict(m) for m in self._matches.values()],
-                 "lifetime": self._lifetime, "meta": self._meta}
+                 "lifetime": self._lifetime, "meta": self._meta,
+                 "elo": self._elo}
             fd, tmp = tempfile.mkstemp(dir=os.path.dirname(self.path) or ".")
             try:
                 with os.fdopen(fd, "w") as f:
@@ -122,6 +127,24 @@ class Store:
     def meta(self, key: str):
         with self.lock:
             return self._meta.get(key)
+
+    # ---- elo history ----------------------------------------------------
+    def record_elo(self, elo: int, ts: Optional[float] = None) -> bool:
+        """Append an elo sample from a refresh. Repeated values are
+        skipped (one point per change), so a flat elo costs nothing."""
+        with self.lock:
+            if self._elo and self._elo[-1]["elo"] == elo:
+                return False
+            self._elo.append({"ts": ts if ts is not None else time.time(),
+                              "elo": elo})
+            if len(self._elo) > self.ELO_CAP:
+                self._elo = self._elo[-self.ELO_CAP:]
+            self._flush()
+            return True
+
+    def elo_series(self) -> list[dict]:
+        with self.lock:
+            return list(self._elo)
 
 
 def summarize(ms: list[Match]) -> dict:

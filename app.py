@@ -151,6 +151,7 @@ class Refresher(threading.Thread):
             elo = games.get("cs2", {}).get("faceit_elo")
             if elo:
                 store.set_meta(faceit_elo=elo)
+                store.record_elo(elo)
         except Exception:
             pass
         known = {m.match_id for m in store.matches(limit=300)}
@@ -240,6 +241,12 @@ def api_matches():
 @app.route("/api/premier/lifetime")
 def api_lifetime():
     return jsonify(store.lifetime("steam") or {"stats": {}})
+
+
+@app.route("/api/elo")
+def api_elo():
+    return jsonify({"elo": store.meta("faceit_elo"),
+                    "series": store.elo_series()})
 
 
 @app.post("/gsi")

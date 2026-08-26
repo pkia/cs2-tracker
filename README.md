@@ -21,7 +21,7 @@ over the tailnet.
 | `/` | dashboard UI |
 | `/api/summary` | combined stats cards |
 | `/api/matches` | unified match feed (faceit + premier) |
-| `/api/elo` | FACEIT elo history series |
+| `/api/elo` | FACEIT elo history — one sample per elo change, recorded at each hourly refresh since install |
 | `/api/premier/lifetime` | Steam lifetime stats |
 | `/gsi` | CS2 GSI ingest (POST from his gaming PC) |
 

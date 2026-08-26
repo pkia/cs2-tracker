@@ -163,6 +163,36 @@ def test_gsi_side_t_loss():
     assert m.team_rounds == 9 and m.enemy_rounds == 13
 
 
+# ---------------------------------------------------------------- elo series
+
+def test_elo_series_dedup_persist_cap(tmp_path):
+    s = Store(str(tmp_path / "t.json"))
+    assert s.record_elo(1600, ts=100) is True
+    assert s.record_elo(1600, ts=200) is False      # repeat -> skipped
+    assert s.record_elo(1650, ts=300) is True
+    assert s.elo_series() == [{"ts": 100, "elo": 1600},
+                              {"ts": 300, "elo": 1650}]
+    s2 = Store(str(tmp_path / "t.json"))            # survives reload
+    assert s2.elo_series() == s.elo_series()
+    for i in range(600):                            # capped, oldest dropped
+        s.record_elo(1000 + i, ts=1000 + i)
+    assert len(s.elo_series()) == Store.ELO_CAP
+    assert s.elo_series()[0]["elo"] == 1000 + 600 - Store.ELO_CAP
+
+
+def test_api_elo(tmp_path, monkeypatch):
+    st = Store(str(tmp_path / "a.json"))
+    st.set_meta(faceit_elo=1600)
+    st.record_elo(1600, ts=100)
+    monkeypatch.setattr(app_mod, "store", st)
+    c = app_mod.app.test_client()
+    r = c.get("/api/elo")
+    assert r.status_code == 200
+    d = r.get_json()
+    assert d["elo"] == 1600
+    assert d["series"] == [{"ts": 100, "elo": 1600}]
+
+
 # ---------------------------------------------------------------- API smoke
 
 def test_api_smoke(tmp_path, monkeypatch):
