@@ -92,14 +92,17 @@ def _session(cookie: str) -> requests.Session:
     return s
 
 
-def authed_lifetime(steamid64: str, cookie: str) -> dict:
-    """Lifetime stats with the owner's logged-in session: the web API
-    first (same endpoint, now called as the user), then his community
-    stats page. Raises SteamError when neither yields stats."""
+def authed_lifetime(steamid64: str, cookie: str, api_key: str) -> dict:
+    """Lifetime stats using the owner's logged-in session. The web API
+    refuses post-restriction keys on their own but serves them when the
+    request also carries the owner's steamLoginSecure cookie (verified
+    live) — key + cookie is the primary path; his community stats page
+    is the fallback. Raises SteamError when neither yields stats."""
     s = _session(cookie)
     try:
         r = s.get(f"{BASE}/ISteamUserStats/GetUserStatsForGame/v2",
-                  params={"steamid": steamid64, "appid": 730}, timeout=15)
+                  params={"key": api_key, "steamid": steamid64,
+                          "appid": 730}, timeout=15)
         if r.ok:
             stats = r.json().get("playerstats", {}).get("stats", [])
             if stats:

@@ -126,7 +126,7 @@ class Refresher(threading.Thread):
                 cookie = read_secret("steam_cookie.txt")
                 if cookie:
                     try:
-                        stats = steam_mod.authed_lifetime(sid, cookie)
+                        stats = steam_mod.authed_lifetime(sid, cookie, sc_key)
                     except Exception as e2:
                         log.info("steam authed lifetime: %s", e2)
                 log.info("steam lifetime: %s", e)
