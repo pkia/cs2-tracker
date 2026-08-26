@@ -1,8 +1,10 @@
 [Unit]
 Description=CS2 Tracker pull-based deploy
 After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=oneshot
+User=ev
 WorkingDirectory=/home/ev/cs2-tracker
 ExecStart=/home/ev/cs2-tracker/deploy/deploy.sh
