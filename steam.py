@@ -14,6 +14,7 @@ comes from GSI (see gsi.py).
 from __future__ import annotations
 
 import re
+from http.cookies import CookieError
 from typing import Optional
 
 import requests
@@ -92,12 +93,15 @@ def _session(cookie: str) -> requests.Session:
     return s
 
 
-def authed_lifetime(steamid64: str, cookie: str, api_key: str) -> dict:
+def authed_lifetime(steamid64: str, cookie: str, api_key: str,
+                    on_rotate=None) -> dict:
     """Lifetime stats using the owner's logged-in session. The web API
     refuses post-restriction keys on their own but serves them when the
     request also carries the owner's steamLoginSecure cookie (verified
     live) — key + cookie is the primary path; his community stats page
-    is the fallback. Raises SteamError when neither yields stats."""
+    is the fallback. Steam rotates the session token on use; when it
+    does, on_rotate(new_cookie) lets the caller persist it. Raises
+    SteamError when neither path yields stats."""
     s = _session(cookie)
     try:
         r = s.get(f"{BASE}/ISteamUserStats/GetUserStatsForGame/v2",
@@ -106,6 +110,7 @@ def authed_lifetime(steamid64: str, cookie: str, api_key: str) -> dict:
         if r.ok:
             stats = r.json().get("playerstats", {}).get("stats", [])
             if stats:
+                _maybe_rotate(s, cookie, on_rotate)
                 return {x["name"]: x.get("value") for x in stats}
     except (requests.RequestException, ValueError):
         pass
@@ -115,4 +120,17 @@ def authed_lifetime(steamid64: str, cookie: str, api_key: str) -> dict:
     out = parse_stat_rows(r.text)
     if not out:
         raise SteamError("stats page had no parseable rows (cookie expired?)")
+    _maybe_rotate(s, cookie, on_rotate)
     return out
+
+
+def _maybe_rotate(s: requests.Session, old: str, on_rotate) -> None:
+    """If Steam handed back a fresh steamLoginSecure, pass it on."""
+    if on_rotate is None:
+        return
+    try:
+        new = s.cookies.get("steamLoginSecure")
+    except CookieError:
+        return
+    if new and new != old.removeprefix("steamLoginSecure=").strip():
+        on_rotate(new)

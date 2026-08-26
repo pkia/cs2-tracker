@@ -42,6 +42,15 @@ def read_secret(name: str) -> Optional[str]:
         return None
 
 
+def write_secret(name: str, value: str):
+    """Persist a rotated secret (keeps whatever perms the file has)."""
+    try:
+        with open(os.path.join(SECRETS, name), "w") as f:
+            f.write(value)
+    except OSError:
+        pass
+
+
 app = Flask(__name__)
 store = Store(os.path.join(DATA, "tracker.json"))
 
@@ -126,7 +135,10 @@ class Refresher(threading.Thread):
                 cookie = read_secret("steam_cookie.txt")
                 if cookie:
                     try:
-                        stats = steam_mod.authed_lifetime(sid, cookie, sc_key)
+                        stats = steam_mod.authed_lifetime(
+                            sid, cookie, sc_key,
+                            on_rotate=lambda c: write_secret(
+                                "steam_cookie.txt", c))
                     except Exception as e2:
                         log.info("steam authed lifetime: %s", e2)
                 log.info("steam lifetime: %s", e)
